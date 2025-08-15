@@ -1,3 +1,5 @@
+Aplikasi kasir sederhana dengan php
+
 Sistem pada source code berbeda dengan ERD karena lebih disempurnakan.
 
 ERD:
