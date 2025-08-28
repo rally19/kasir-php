@@ -1,8 +1,13 @@
 <?php
+$PAJAK_TETAP = 10.0;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $PelangganID = $_POST['PelangganID'];
     $TanggalPenjualan = date("Y-m-d"); 
-    $TotalHarga = 0; 
+    $TotalHarga = 0;
+    $TotalHargaKotor = 0;
+    $DiskonGlobal = isset($_POST['DiskonGlobal']) ? floatval($_POST['DiskonGlobal']) : 0;
+    $Pajak = $PAJAK_TETAP;
 
     if (!empty($PelangganID) && !empty($_POST['produk'])) {
         // Ambil data pelanggan
@@ -11,8 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pelanggan_data = mysqli_fetch_assoc($pelanggan_result);
         
         // Insert ke tabel penjualan dengan data pelanggan
-        $sql = "INSERT INTO penjualan (PelangganID, TanggalPenjualan, TotalHarga, NamaPelanggan, Alamat, NomorTelepon) 
-                VALUES ('$PelangganID', '$TanggalPenjualan', '$TotalHarga', 
+        $sql = "INSERT INTO penjualan (PelangganID, TanggalPenjualan, TotalHarga, HargaKotor, Diskon, Pajak, NamaPelanggan, Alamat, NomorTelepon) 
+                VALUES ('$PelangganID', '$TanggalPenjualan', '$TotalHarga', '$TotalHargaKotor', '$DiskonGlobal', '$Pajak', 
                 '{$pelanggan_data['NamaPelanggan']}', '{$pelanggan_data['Alamat']}', '{$pelanggan_data['NomorTelepon']}')";
 
         $result = mysqli_query($conn, $sql);
@@ -24,18 +29,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($_POST['produk'] as $produk) {
                 $ProdukID = $produk['ProdukID'];
                 $JumlahProduk = $produk['JumlahProduk'];
+                $Diskon = isset($produk['Diskon']) ? floatval($produk['Diskon']) : 0;
                 
                 // Ambil data produk
                 $produk_query = "SELECT NamaProduk, Harga, Stok FROM produk WHERE ProdukID = '$ProdukID'";
                 $produk_result = mysqli_query($conn, $produk_query);
                 $produk_data = mysqli_fetch_assoc($produk_result);
                 
-                $Subtotal = $produk_data['Harga'] * $JumlahProduk;
+                $HargaKotor = $produk_data['Harga'] * $JumlahProduk;
+                $Subtotal = $HargaKotor * (1 - $Diskon / 100);
+                $TotalHargaKotor += $HargaKotor;
                 $TotalHarga += $Subtotal;
                 
                 // Insert ke detail penjualan
-                $detail_sql = "INSERT INTO detailpenjualan (PenjualanID, ProdukID, NamaProduk, Harga, JumlahProduk, Subtotal)
-                              VALUES ('$PenjualanID', '$ProdukID', '{$produk_data['NamaProduk']}', '{$produk_data['Harga']}', '$JumlahProduk', '$Subtotal')";
+                $detail_sql = "INSERT INTO detailpenjualan (PenjualanID, ProdukID, NamaProduk, Harga, JumlahProduk, HargaKotor, Diskon, Subtotal)
+                              VALUES ('$PenjualanID', '$ProdukID', '{$produk_data['NamaProduk']}', '{$produk_data['Harga']}', '$JumlahProduk', '$HargaKotor', '$Diskon', '$Subtotal')";
                 mysqli_query($conn, $detail_sql);
                 
                 // Update stok produk
@@ -43,8 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_query($conn, $update_stok);
             }
             
+            // Hitung total setelah diskon global dan pajak
+            $TotalSetelahDiskonGlobal = $TotalHarga * (1 - $DiskonGlobal / 100);
+            $TotalAkhir = $TotalSetelahDiskonGlobal * (1 + $Pajak / 100);
+            
             // Update total harga di penjualan
-            $update_total = "UPDATE penjualan SET TotalHarga = '$TotalHarga' WHERE PenjualanID = '$PenjualanID'";
+            $update_total = "UPDATE penjualan SET TotalHarga = '$TotalAkhir', HargaKotor = '$TotalHargaKotor' WHERE PenjualanID = '$PenjualanID'";
             mysqli_query($conn, $update_total);
             
             echo "<script>alert('Penjualan berhasil ditambahkan!');</script>";
@@ -94,7 +106,7 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                 <div class="uk-margin">
                     <label class="uk-form-label"><strong>Produk:</strong></label>
                     <div class="uk-grid-small" uk-grid>
-                        <div class="uk-width-1-2@s">
+                        <div class="uk-width-1-3@s">
                             <select id="ProdukID" class="uk-select">
                                 <option value="" selected disabled>Pilih Produk</option>
                                 <?php foreach ($produk_options as $produk): ?>
@@ -109,8 +121,11 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="uk-width-1-4@s">
+                        <div class="uk-width-1-6@s">
                             <input type="number" id="JumlahProduk" class="uk-input" min="1" value="1" required>
+                        </div>
+                        <div class="uk-width-1-6@s">
+                            <input type="number" id="DiskonProduk" class="uk-input" min="0" max="100" value="0" placeholder="Diskon %">
                         </div>
                         <div class="uk-width-1-4@s">
                             <button type="button" id="tambahProduk" class="uk-button uk-button-primary uk-width-1-1">Tambah</button>
@@ -126,6 +141,7 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                                 <th>Harga</th>
                                 <th>Stok Tersedia</th>
                                 <th>Jumlah</th>
+                                <th>Diskon</th>
                                 <th>Subtotal</th>
                                 <th>Aksi</th>
                             </tr>
@@ -135,9 +151,31 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <th colspan="4">Total</th>
-                                <th id="totalHarga">Rp 0</th>
-                                <th></th>
+                                <td colspan="5" class="uk-text-right"><strong>Total Harga Kotor:</strong></td>
+                                <td id="totalHargaKotor">Rp 0</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="5" class="uk-text-right">
+                                    <div class="uk-grid-small" uk-grid>
+                                        <div class="uk-width-1-2">
+                                            <label class="uk-form-label">Diskon Total (%):</label>
+                                            <input type="number" name="DiskonGlobal" id="DiskonGlobal" class="uk-input" min="0" max="100" value="0">
+                                        </div>
+                                        <div class="uk-width-1-2">
+                                            <label class="uk-form-label">Pajak (%):</label>
+                                            <input type="text" class="uk-input" value="<?php echo $PAJAK_TETAP; ?>%" disabled>
+                                            <input type="hidden" name="Pajak" value="<?php echo $PAJAK_TETAP; ?>">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td id="totalSetelahDiskonPajak">Rp 0</td>
+                                <td></td>
+                            </tr>
+                            <tr class="uk-text-bold">
+                                <td colspan="5" class="uk-text-right"><strong>Total Akhir:</strong></td>
+                                <td id="totalAkhir">Rp 0</td>
+                                <td></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -160,8 +198,10 @@ $(document).ready(function() {
     $('#PelangganID, #ProdukID').select2();
     
     let produkList = [];
+    let totalHargaKotor = 0;
     let totalHarga = 0;
     let produkOptions = <?php echo json_encode($produk_options); ?>;
+    let pajakTetap = <?php echo $PAJAK_TETAP; ?>;
     
     // Fungsi untuk update dropdown produk
     function updateProdukDropdown() {
@@ -191,22 +231,34 @@ $(document).ready(function() {
     
     // Fungsi untuk menghitung ulang total dan update tampilan
     function hitungTotal() {
+        totalHargaKotor = 0;
         totalHarga = 0;
         
         produkList.forEach((produk, index) => {
-            // Hitung subtotal untuk setiap produk
-            const subtotal = produk.harga * produk.jumlah;
+            // Hitung harga kotor dan subtotal untuk setiap produk
+            const hargaKotor = produk.harga * produk.jumlah;
+            const subtotal = hargaKotor * (1 - produk.diskon / 100);
+            totalHargaKotor += hargaKotor;
             totalHarga += subtotal;
             
             // Update tampilan subtotal di tabel
-            $(`#produkTable tbody tr:eq(${index}) td:nth-child(5)`).text('Rp ' + subtotal.toLocaleString('id-ID'));
+            $(`#produkTable tbody tr:eq(${index}) td:nth-child(6)`).text('Rp ' + subtotal.toLocaleString('id-ID'));
             
             // Update hidden input untuk form submit
             $(`input[name="produk[${index}][JumlahProduk]"]`).val(produk.jumlah);
+            $(`input[name="produk[${index}][Diskon]"]`).val(produk.diskon);
         });
         
-        // Update total harga
-        $('#totalHarga').text('Rp ' + totalHarga.toLocaleString('id-ID'));
+        // Hitung diskon global
+        const diskonGlobal = parseFloat($('#DiskonGlobal').val()) || 0;
+        
+        const totalSetelahDiskonGlobal = totalHarga * (1 - diskonGlobal / 100);
+        const totalAkhir = totalSetelahDiskonGlobal * (1 + pajakTetap / 100);
+        
+        // Update tampilan total
+        $('#totalHargaKotor').text('Rp ' + totalHargaKotor.toLocaleString('id-ID'));
+        $('#totalSetelahDiskonPajak').text('Rp ' + totalSetelahDiskonGlobal.toLocaleString('id-ID'));
+        $('#totalAkhir').text('Rp ' + totalAkhir.toLocaleString('id-ID'));
     }
     
     // Tambah produk ke tabel
@@ -216,6 +268,7 @@ $(document).ready(function() {
         const Harga = parseInt($('#ProdukID option:selected').data('harga'));
         const Stok = parseInt($('#ProdukID option:selected').data('stok'));
         const JumlahProduk = parseInt($('#JumlahProduk').val());
+        const Diskon = parseFloat($('#DiskonProduk').val()) || 0;
         
         if (!ProdukID || JumlahProduk < 1) {
             alert('Silakan pilih produk dan masukkan jumlah yang valid');
@@ -224,6 +277,11 @@ $(document).ready(function() {
         
         if (JumlahProduk > Stok) {
             alert('Jumlah melebihi stok tersedia! Stok: ' + Stok);
+            return;
+        }
+        
+        if (Diskon < 0 || Diskon > 100) {
+            alert('Diskon harus antara 0-100%');
             return;
         }
         
@@ -236,13 +294,15 @@ $(document).ready(function() {
                 return;
             }
             produkList[existingIndex].jumlah = newJumlah;
+            produkList[existingIndex].diskon = Diskon; // Update diskon
         } else {
             produkList.push({
                 id: ProdukID,
                 nama: NamaProduk,
                 harga: Harga,
                 stok: Stok,
-                jumlah: JumlahProduk
+                jumlah: JumlahProduk,
+                diskon: Diskon
             });
         }
         
@@ -252,6 +312,7 @@ $(document).ready(function() {
         
         // Reset form
         $('#JumlahProduk').val(1);
+        $('#DiskonProduk').val(0);
     });
     
     // Update tabel produk
@@ -260,7 +321,9 @@ $(document).ready(function() {
         tbody.empty();
         
         produkList.forEach((produk, index) => {
-            const subtotal = produk.harga * produk.jumlah;
+            const hargaKotor = produk.harga * produk.jumlah;
+            const subtotal = hargaKotor * (1 - produk.diskon / 100);
+            
             tbody.append(`
                 <tr>
                     <td>${produk.nama}</td>
@@ -271,10 +334,16 @@ $(document).ready(function() {
                                min="1" max="${produk.stok}" value="${produk.jumlah}" 
                                data-index="${index}">
                     </td>
+                    <td>
+                        <input type="number" class="uk-input uk-form-width-small diskon-produk" 
+                               min="0" max="100" value="${produk.diskon}" 
+                               data-index="${index}"> %
+                    </td>
                     <td class="subtotal">Rp ${subtotal.toLocaleString('id-ID')}</td>
                     <td><button type="button" class="uk-button uk-button-danger uk-button-small hapusProduk" data-index="${index}">Hapus</button></td>
                     <input type="hidden" name="produk[${index}][ProdukID]" value="${produk.id}">
                     <input type="hidden" name="produk[${index}][JumlahProduk]" value="${produk.jumlah}">
+                    <input type="hidden" name="produk[${index}][Diskon]" value="${produk.diskon}">
                 </tr>
             `);
         });
@@ -312,6 +381,35 @@ $(document).ready(function() {
         produkList[index].jumlah = newJumlah;
         
         // Hitung ulang total
+        hitungTotal();
+    });
+    
+    // Update diskon produk
+    $(document).on('change', '.diskon-produk', function() {
+        const index = $(this).data('index');
+        let newDiskon = parseFloat($(this).val());
+        
+        // Validasi input
+        if (isNaN(newDiskon) || newDiskon < 0) {
+            newDiskon = 0;
+            $(this).val(0);
+        }
+        
+        if (newDiskon > 100) {
+            alert('Diskon tidak boleh lebih dari 100%');
+            newDiskon = 100;
+            $(this).val(100);
+        }
+        
+        // Update data produk
+        produkList[index].diskon = newDiskon;
+        
+        // Hitung ulang total
+        hitungTotal();
+    });
+    
+    // Update ketika diskon global berubah (pajak tetap)
+    $('#DiskonGlobal').on('change', function() {
         hitungTotal();
     });
     
