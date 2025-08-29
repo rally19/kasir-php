@@ -14,7 +14,6 @@ $penjualan = mysqli_fetch_assoc($penjualan_result);
 $detail_sql = "SELECT * FROM detailpenjualan WHERE PenjualanID = '$PenjualanID'";
 $detail_result = mysqli_query($conn, $detail_sql);
 
-// Hitung nilai diskon dan pajak untuk ditampilkan
 $diskon_nominal = $penjualan['HargaKotor'] * ($penjualan['Diskon'] / 100);
 $harga_setelah_diskon = $penjualan['HargaKotor'] - $diskon_nominal;
 $pajak_nominal = $harga_setelah_diskon * ($penjualan['Pajak'] / 100);
@@ -84,16 +83,15 @@ $pajak_nominal = $harga_setelah_diskon * ($penjualan['Pajak'] / 100);
                                 </thead>
                                 <tbody>
                                     <?php if (mysqli_num_rows($detail_result) > 0): ?>
-                                        <?php mysqli_data_seek($detail_result, 0); // Reset pointer ?>
                                         <?php $no = 1; ?>
                                         <?php while ($detail = mysqli_fetch_assoc($detail_result)): ?>
                                             <tr>
                                                 <td><?php echo $no++; ?></td>
                                                 <td><?php echo $detail['NamaProduk']; ?></td>
-                                                <td class="uk-text-right">Rp <?php echo number_format($detail['Harga'], 0, ',', '.'); ?></td>
+                                                <td class="uk-text-right"><?php echo formatUang($detail['Harga']); ?></td>
                                                 <td class="uk-text-center"><?php echo $detail['JumlahProduk']; ?></td>
                                                 <td class="uk-text-center"><?php echo $detail['Diskon']; ?>%</td>
-                                                <td class="uk-text-right">Rp <?php echo number_format($detail['Subtotal'], 0, ',', '.'); ?></td>
+                                                <td class="uk-text-right"><?php echo formatUang($detail['Subtotal']); ?></td>
                                             </tr>
                                         <?php endwhile; ?>
                                     <?php else: ?>
@@ -117,23 +115,23 @@ $pajak_nominal = $harga_setelah_diskon * ($penjualan['Pajak'] / 100);
                                 <tbody>
                                     <tr>
                                         <td class="uk-width-1-2 uk-text-bold">Total Harga Kotor</td>
-                                        <td class="uk-text-right">Rp <?php echo number_format($penjualan['HargaKotor'], 0, ',', '.'); ?></td>
+                                        <td class="uk-text-right"><?php echo formatUang($penjualan['HargaKotor']); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="uk-text-bold">Diskon Total (<?php echo $penjualan['Diskon']; ?>%)</td>
-                                        <td class="uk-text-right">- Rp <?php echo number_format($diskon_nominal, 0, ',', '.'); ?></td>
+                                        <td class="uk-text-right">- <?php echo formatUang($diskon_nominal); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="uk-text-bold">Subtotal Setelah Diskon</td>
-                                        <td class="uk-text-right">Rp <?php echo number_format($harga_setelah_diskon, 0, ',', '.'); ?></td>
+                                        <td class="uk-text-right"><?php echo formatUang($harga_setelah_diskon); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="uk-text-bold">Pajak (<?php echo $penjualan['Pajak']; ?>%)</td>
-                                        <td class="uk-text-right">+ Rp <?php echo number_format($pajak_nominal, 0, ',', '.'); ?></td>
+                                        <td class="uk-text-right">+ <?php echo formatUang($pajak_nominal); ?></td>
                                     </tr>
                                     <tr class="uk-background-muted">
                                         <td class="uk-text-bold uk-text-large">TOTAL AKHIR</td>
-                                        <td class="uk-text-right uk-text-bold uk-text-large">Rp <?php echo number_format($penjualan['TotalHarga'], 0, ',', '.'); ?></td>
+                                        <td class="uk-text-right uk-text-bold uk-text-large"><?php echo formatUang($penjualan['TotalHarga']); ?></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -165,7 +163,7 @@ $pajak_nominal = $harga_setelah_diskon * ($penjualan['Pajak'] / 100);
         </div>
         
         <div class="uk-card-footer uk-text-center uk-background-muted">
-            <p class="uk-text-small">Terima kasih telah berbelanja di toko kami. <!--Barang yang sudah dibeli tidak dapat dikembalikan.--> </p> 
+            <p class="uk-text-small">Terima kasih telah berbelanja di toko kami. </p> 
         </div>
     </div>
     

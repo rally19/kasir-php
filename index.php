@@ -50,17 +50,11 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list-penjualan';
         </div>
         <div class="uk-width-expand">
             <div uk-sticky="sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky">
-            <nav class="uk-navbar-container" uk-navbar>
+            <nav class="uk-navbar-container" style="height: 50px;" uk-navbar>
                 <div class="uk-navbar-left uk-flex uk-flex-1 uk-margin-left">
-                    <form class="uk-search uk-search-default" style="flex-grow: 1;">
-                        <span uk-search-icon></span>
-                        <input class="uk-search-input uk-width-1-1" type="search" placeholder="Search...">
-                    </form>
+                    <span id="clock">
                 </div>
                 <div class="uk-navbar-right uk-margin-left uk-margin-right">
-                <a class="uk-navbar-toggle" href="#" uk-icon="user"></a>
-                <div uk-dropdown="pos: bottom-right; delay-hide: 400; animation: uk-animation-slide-top-small; animate-out: true; offset: -1">
-                </div>
                     <a class="uk-hidden@m uk-icon-link" href="#" uk-icon="icon: menu" uk-toggle="target: #offcanvas-sidebar"></a>
                 </div>
             </nav>
@@ -155,5 +149,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list-penjualan';
     <script src="src/js/fungsis.js"></script>
     <script src="src/js/uikit.js"></script>
     <script src="src/js/uikit-icons.js"></script>
+    <script>
+        window.onload = displayClock;
+
+        function displayClock() {
+            const display = new Date().toLocaleTimeString();
+            document.getElementById("clock").innerHTML = display;
+            setTimeout(displayClock, 1000);
+        }
+    </script>
 </body>
 </html>

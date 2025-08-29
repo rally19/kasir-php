@@ -115,7 +115,7 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                                             data-nama="<?php echo $produk['NamaProduk'] ?>"
                                             data-stok="<?php echo $produk['Stok'] ?>">
                                         <?php echo $produk['NamaProduk'] ?> 
-                                        (Rp <?php echo number_format($produk['Harga'], 0, ',', '.') ?>) 
+                                        (<?php echo formatUang($produk['Harga']) ?>) 
                                         - Stok: <?php echo $produk['Stok'] ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -179,6 +179,19 @@ while ($row = mysqli_fetch_assoc($produk_result)) {
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+
+                <div class="uk-margin">
+                    <div class="uk-grid-small" uk-grid>
+                        <div class="uk-width-1-2@s">
+                            <label class="uk-form-label"><strong>Dibayar:</strong></label>
+                            <input type="number" id="Bayar" class="uk-input" min="0" required>
+                        </div>
+                        <div class="uk-width-1-2@s">
+                            <label class="uk-form-label"><strong>Kembalian:</strong></label>
+                            <input type="number" id="Kembalian" class="uk-input" min="0" disabled>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="uk-text-center">
@@ -294,7 +307,7 @@ $(document).ready(function() {
                 return;
             }
             produkList[existingIndex].jumlah = newJumlah;
-            produkList[existingIndex].diskon = Diskon; // Update diskon
+            produkList[existingIndex].diskon = Diskon;
         } else {
             produkList.push({
                 id: ProdukID,
@@ -408,7 +421,25 @@ $(document).ready(function() {
         hitungTotal();
     });
     
-    // Update ketika diskon global berubah (pajak tetap)
+    // Pembayaran dan kembalian
+    $('#Bayar').on('input', function() {
+        // Ambil total akhir dari tampilan (tanpa "Rp" dan titik)
+        let totalAkhirText = $('#totalAkhir').text().replace(/[^\d]/g, '');
+        let totalAkhir = parseInt(totalAkhirText) || 0;
+        let bayar = parseInt($(this).val()) || 0;
+        let kembalian = bayar - totalAkhir;
+        $('#Kembalian').val(kembalian > 0 ? kembalian : 0);
+    });
+
+    // Update kembalian jika total berubah
+    $('#DiskonGlobal').on('input', function() {
+        $('#Bayar').trigger('input');
+    });
+    $(document).on('change', '.jumlah-produk, .diskon-produk', function() {
+        $('#Bayar').trigger('input');
+    });
+
+    // Update ketika diskon global berubah
     $('#DiskonGlobal').on('change', function() {
         hitungTotal();
     });
@@ -416,9 +447,18 @@ $(document).ready(function() {
     // Validasi form sebelum submit
     $('#penjualanForm').submit(function() {
         if (produkList.length === 0) {
-            alert('Silakan tambahkan minimal 1 produk');
+            alert('Tambahkan minimal 1 produk');
             return false;
         }
+        // JIKA terdapat kembalian maka akan muncul alert untuk mengingatkan kasir untuk membayar kembali jumlah kembalian
+        let totalAkhirText = $('#totalAkhir').text().replace(/[^\d]/g, '');
+        let totalAkhir = parseInt(totalAkhirText) || 0;
+        let bayar = parseInt($('#Bayar').val()) || 0;
+        let kembalian = bayar - totalAkhir;
+        if (kembalian > 0) {
+            alert('Kembalian: Rp ' + kembalian.toLocaleString('id-ID') + '. Ingat untuk memberikan kembalian kepada pelanggan.');
+        }
+        
         return true;
     });
     
